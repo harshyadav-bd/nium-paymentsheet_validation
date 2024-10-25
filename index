@@ -1,0 +1,172 @@
+<!-- Index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transaction Data Verifier</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #1a73e8;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #5f6368;
+      font-weight: 500;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #dadce0;
+      border-radius: 5px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #1a73e8;
+      outline: none;
+    }
+
+    .button-container {
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    button {
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #1557b0;
+    }
+
+    button:disabled {
+      background-color: #dadce0;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      text-align: center;
+      display: none;
+    }
+
+    .success {
+      background-color: #e6f4ea;
+      color: #1e8e3e;
+    }
+
+    .error {
+      background-color: #fce8e6;
+      color: #d93025;
+    }
+
+    .loading {
+      display: inline-block;
+      margin-right: 8px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>NIUM MassPay Upload Sheet Verifier</h1>
+    
+    <div class="form-group">
+      <label for="spreadsheetId">Google Spreadsheet ID:</label>
+      <input type="text" id="spreadsheetId" 
+             placeholder="Enter the Google Sheet ID from the Payment Sheet URL"
+             title="Find this ID in your spreadsheet URL: https://docs.google.com/spreadsheets/d/[THIS-IS-THE-ID]/edit">
+    </div>
+
+    <div class="button-container">
+      <button onclick="processSheet()" id="processButton">
+        <i class="fas fa-play"></i> Process Spreadsheet
+      </button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    function processSheet() {
+      const spreadsheetId = document.getElementById('spreadsheetId').value.trim();
+      const processButton = document.getElementById('processButton');
+      const statusDiv = document.getElementById('status');
+
+      if (!spreadsheetId) {
+        showStatus('Please enter a Spreadsheet ID', false);
+        return;
+      }
+
+      // Disable button and show loading state
+      processButton.disabled = true;
+      processButton.innerHTML = '<i class="fas fa-spinner loading"></i> Processing...';
+      statusDiv.style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          processButton.disabled = false;
+          processButton.innerHTML = '<i class="fas fa-play"></i> Process Spreadsheet';
+          showStatus(response.message, response.success);
+        })
+        .withFailureHandler(function(error) {
+          processButton.disabled = false;
+          processButton.innerHTML = '<i class="fas fa-play"></i> Process Spreadsheet';
+          showStatus('Error: ' + error.message, false);
+        })
+        .processSpreadsheet(spreadsheetId);
+    }
+
+    function showStatus(message, isSuccess) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.style.display = 'block';
+      statusDiv.className = isSuccess ? 'success' : 'error';
+      statusDiv.innerHTML = isSuccess ? 
+        '<i class="fas fa-check-circle"></i> ' + message :
+        '<i class="fas fa-exclamation-circle"></i> ' + message;
+    }
+  </script>
+</body>
+</html>
