@@ -22,12 +22,15 @@ function verifyTransactionData() {
     const destinationCurrency = transactionRow[1]; // Column B
     const beneficiaryAccountNumber = transactionRow[37]; // Column AL (38th column)
     const routingCodeValue1 = transactionRow[42]; // Column AQ (43rd column)
+    const columnCValue = (transactionRow[2] || '').toString(); // Column C
+    const columnFValue = (transactionRow[5] || '').toString(); // Column F
     
     // Find matching row in SF_RAW
     sfRawData.forEach((sfRow) => {
       const contractorName = (sfRow[1] || '').toString().toLowerCase(); // Column B
       const invoiceNumber = sfRow[2]; // Column C
       const bankInfo = sfRow[9]; // Column J
+      const columnHValue = (sfRow[7] || '').toString(); // Column H
       
       // Skip if either name is empty
       if (!beneficiaryName || !contractorName) {
@@ -87,6 +90,17 @@ function verifyTransactionData() {
             routingCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
           }
         }
+
+        // 5. Check if Column C or F matches Column H from SF_RAW
+        if (columnCValue === columnHValue) {
+          const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3); // Column C
+          columnCCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        }
+        
+        if (columnFValue === columnHValue) {
+          const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6); // Column F
+          columnFCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        }
       }
     });
   });
@@ -97,8 +111,8 @@ function clearVerification() {
   const transactionsSheet = ss.getSheetByName('Transactions');
   const lastRow = transactionsSheet.getLastRow();
   
-  // Clear borders for all relevant columns
-  const columnsToCheck = [1, 2, 23, 38, 47]; // A, B, W, AL, AQ
+  // Clear borders for all relevant columns (added columns 3 and 6)
+  const columnsToCheck = [1, 2, 3, 6, 23, 38, 43]; // A, B, C, F, W, AL, AQ
   columnsToCheck.forEach(col => {
     const range = transactionsSheet.getRange(2, col, lastRow - 1, 1);
     range.setBorder(false, false, false, false, false, false);
