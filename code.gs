@@ -91,7 +91,7 @@ function processSpreadsheet(spreadsheetId) {
             currencyCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
           }
 
-          // 2. Verify Invoice Currency
+          // 3. Verify Invoice Currency
           if (columnEValue === columnIValue) {
             const columnECell = transactionsSheet.getRange(rowIndex + 2, 5); // Column E
             columnECell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
@@ -168,6 +168,64 @@ function clearVerification(spreadsheetId) {
     return {
       success: false,
       message: "Error clearing verification: " + error.toString()
+    };
+  }
+}
+
+// Function to handle file movement to Payment Uploads folder
+function moveFileToPaymentUploads(spreadsheetId) {
+  try {
+    // Get the file by ID
+    const file = DriveApp.getFileById(spreadsheetId);
+    const originalName = file.getName();
+    
+    // Get current date and format it
+    const currentDate = new Date();
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const formattedDate = `${monthNames[currentDate.getMonth()]} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
+    
+    // Rename file based on the pattern: everything before "-" + formatted date
+    const nameParts = originalName.split('-');
+    if (nameParts.length > 1) {
+      const newName = `${nameParts[0].trim()} - ${formattedDate}`;
+      file.setName(newName);
+    }
+    
+    // Get or create month folder (format: MM.YYYY Payment Uploads)
+    const parentFolder = DriveApp.getFolderById('15V7lVpj5kaF1YjzhZkXvicb6diSV9thF');
+    const monthFolderName = `${(currentDate.getMonth() + 1).toString().padStart(2, '0')}.${currentDate.getFullYear()} Payment Uploads`;
+    
+    // Check if month folder exists, if not create it
+    let monthFolder;
+    const monthFolders = parentFolder.getFoldersByName(monthFolderName);
+    if (monthFolders.hasNext()) {
+      monthFolder = monthFolders.next();
+    } else {
+      monthFolder = parentFolder.createFolder(monthFolderName);
+    }
+    
+    // Get or create date folder (format: Month DD, YYYY)
+    const dateFolderName = formattedDate;
+    let dateFolder;
+    const dateFolders = monthFolder.getFoldersByName(dateFolderName);
+    if (dateFolders.hasNext()) {
+      dateFolder = dateFolders.next();
+    } else {
+      dateFolder = monthFolder.createFolder(dateFolderName);
+    }
+    
+    // Move file to the appropriate date folder
+    file.moveTo(dateFolder);
+    
+    return {
+      success: true,
+      message: `File successfully moved to ${monthFolderName}/${dateFolderName}`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: "Error moving file: " + error.toString()
     };
   }
 }
