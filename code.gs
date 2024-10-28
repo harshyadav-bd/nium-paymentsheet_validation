@@ -42,15 +42,13 @@ function processSpreadsheet(spreadsheetId) {
       
       // Find matching row in SF_RAW
       sfRawData.forEach((sfRow) => {
-        // Trim whitespace from SF_RAW values except specified columns
-        const contractorName = (sfRow[1] || '').toString().toLowerCase().trim(); // Column B
         const invoiceNumber = (sfRow[2] || '').toString().trim(); // Column C
         const columnHValue = (sfRow[7] || '').toString().trim(); // Column H
         const bankInfo = sfRow[9]; // Column J
         const columnIValue = (sfRow[8] || '').toString().trim(); // Column I
         
         // Skip if either name is empty
-        if (!beneficiaryName || !contractorName) {
+        if (!beneficiaryName) {
           return;
         }
 
@@ -76,7 +74,7 @@ function processSpreadsheet(spreadsheetId) {
         }
         
         // Check if names match (case-insensitive and trimmed)
-        if (beneficiaryName === contractorName) {
+        if (beneficiaryName === bankInfoObj.beneficiaryName.toLowerCase().trim()) {
           // Set green border for beneficiary name cell
           const nameCell = transactionsSheet.getRange(rowIndex + 2, 23); // Column W
           nameCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
@@ -95,8 +93,8 @@ function processSpreadsheet(spreadsheetId) {
 
           // 2. Verify Invoice Currency
           if (columnEValue === columnIValue) {
-          const columnECell = transactionsSheet.getRange(rowIndex + 2, 5); // Column E
-          columnECell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+            const columnECell = transactionsSheet.getRange(rowIndex + 2, 5); // Column E
+            columnECell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
           }
           
           // 4. Verify beneficiary account number (Tab1.AL matches beneficiaryAccountNumber in Tab2.J)
