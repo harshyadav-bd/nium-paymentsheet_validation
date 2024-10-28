@@ -24,9 +24,11 @@ function processSpreadsheet(spreadsheetId) {
     const transactionsData = transactionsSheet.getRange(2, 1, transactionsSheet.getLastRow() - 1, transactionsSheet.getLastColumn()).getValues();
     const sfRawData = sfRawSheet.getRange(2, 1, sfRawSheet.getLastRow() - 1, sfRawSheet.getLastColumn()).getValues();
     
-    // Create green border style
+    // Create border styles
     const greenBorder = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
     const greenColor = '#00FF00';
+    const redBorder = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
+    const redColor = '#FF0000';
 
     // Process each row in the transactions sheet
     transactionsData.forEach((transactionRow, rowIndex) => {
@@ -64,7 +66,6 @@ function processSpreadsheet(spreadsheetId) {
             if (bankInfoObj.routingCodeValue1) {
               bankInfoObj.routingCodeValue1 = bankInfoObj.routingCodeValue1.trim();
             }
-            // Don't trim destinationCurrency as specified
           } else {
             return; // Skip if bankInfo is empty
           }
@@ -83,33 +84,41 @@ function processSpreadsheet(spreadsheetId) {
           if (invoiceNumber === transactionNumber) {
             const transactionCell = transactionsSheet.getRange(rowIndex + 2, 1); // Column A
             transactionCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+          } else {
+            const transactionCell = transactionsSheet.getRange(rowIndex + 2, 1); // Column A
+            transactionCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
           }
           
-          // 2. Verify destination currency from JSON (Tab1.B matches destinationCurrency in Tab2.J)
+          // 2. Verify destination currency
           if (bankInfoObj.destinationCurrency === destinationCurrency) {
             const currencyCell = transactionsSheet.getRange(rowIndex + 2, 2); // Column B
             currencyCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+          } else {
+            const currencyCell = transactionsSheet.getRange(rowIndex + 2, 2); // Column B
+            currencyCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
           }
 
-          // 3. Verify Invoice Currency
+          // 3. Verify Invoice Currency (Column E - only green border, no red)
           if (columnEValue === columnIValue) {
             const columnECell = transactionsSheet.getRange(rowIndex + 2, 5); // Column E
             columnECell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
           }
           
-          // 4. Verify beneficiary account number (Tab1.AL matches beneficiaryAccountNumber in Tab2.J)
+          // 4. Verify beneficiary account number
           if (bankInfoObj.beneficiaryAccountNumber) {
-            // Remove spaces from both strings for comparison
             const cleanBankInfoAccount = bankInfoObj.beneficiaryAccountNumber.replace(/\s+/g, '');
             const cleanTransactionAccount = beneficiaryAccountNumber.replace(/\s+/g, '');
             
             if (cleanBankInfoAccount === cleanTransactionAccount) {
               const accountCell = transactionsSheet.getRange(rowIndex + 2, 38); // Column AL
               accountCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+            } else {
+              const accountCell = transactionsSheet.getRange(rowIndex + 2, 38); // Column AL
+              accountCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
             }
           }
           
-          // 5. Verify routing code value (Tab1.AQ matches routingCodeValue1 in Tab2.J)
+          // 5. Verify routing code value
           if (bankInfoObj.routingCodeValue1 && routingCodeValue1) {
             const cleanBankInfoRouting = bankInfoObj.routingCodeValue1.replace(/\s+/g, '');
             const cleanTransactionRouting = routingCodeValue1.replace(/\s+/g, '');
@@ -117,26 +126,42 @@ function processSpreadsheet(spreadsheetId) {
             if (cleanBankInfoRouting === cleanTransactionRouting) {
               const routingCell = transactionsSheet.getRange(rowIndex + 2, 43); // Column AQ
               routingCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+            } else {
+              const routingCell = transactionsSheet.getRange(rowIndex + 2, 43); // Column AQ
+              routingCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
             }
           }
 
           // 6. Verify if Column C or F matches Column H from SF_RAW
-          if (columnCValue === columnHValue) {
-            const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3); // Column C
-            columnCCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-          }
-          
-          if (columnFValue === columnHValue) {
-            const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6); // Column F
-            columnFCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-          }
+            const cMatches = columnCValue === columnHValue;
+            const fMatches = columnFValue === columnHValue;
+
+            // Apply green border to Column C if it matches
+            if (cMatches) {
+              const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3); // Column C
+              columnCCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+            } else if (!cMatches && !fMatches) {
+              // Only apply red border to Column C if neither C nor F matches
+              const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3); // Column C
+              columnCCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+            }
+
+            // Apply green border to Column F if it matches
+            if (fMatches) {
+              const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6); // Column F
+              columnFCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+            } else if (!cMatches && !fMatches) {
+              // Only apply red border to Column F if neither C nor F matches
+              const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6); // Column F
+              columnFCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+            }
         }
       });
     });
 
     return {
       success: true,
-      message: "Processing completed successfully! The matching cells have been highlighted in green."
+      message: "Processing completed successfully! Matching cells are highlighted in green, mismatches in red."
     };
     
   } catch (error) {
@@ -154,7 +179,7 @@ function clearVerification(spreadsheetId) {
     const lastRow = transactionsSheet.getLastRow();
     
     // Clear borders for all relevant columns
-    const columnsToCheck = [1, 2, 3, 5, 6, 23, 38, 43]; // A, B, C, F, W, AL, AQ
+    const columnsToCheck = [1, 2, 3, 5, 6, 23, 38, 43]; // A, B, C, E, F, W, AL, AQ
     columnsToCheck.forEach(col => {
       const range = transactionsSheet.getRange(2, col, lastRow - 1, 1);
       range.setBorder(false, false, false, false, false, false);
@@ -172,7 +197,6 @@ function clearVerification(spreadsheetId) {
   }
 }
 
-// Function to handle file movement to Payment Uploads folder
 function moveFileToPaymentUploads(spreadsheetId) {
   try {
     // Get the file by ID
