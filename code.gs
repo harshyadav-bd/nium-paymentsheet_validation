@@ -6,157 +6,162 @@ function doGet() {
 
 function processSpreadsheet(spreadsheetId) {
   try {
-    // Get the spreadsheet by ID
     const ss = SpreadsheetApp.openById(spreadsheetId);
-    
-    // Get both sheets
     const transactionsSheet = ss.getSheetByName('Transactions');
-    const sfRawSheet = ss.getSheetByName('SF_RAW');
+    const sfRawSpreadsheet = SpreadsheetApp.openById('19rkSHP7fkOl4aFJ6MtUx7EVclsKGCCb7PzWNvNPDjIc');
+const sfRawSheet = sfRawSpreadsheet.getSheetByName('SF_RAW');
     
     if (!transactionsSheet || !sfRawSheet) {
-      return {
-        success: false,
-        message: "Error: Could not find sheets named 'Transactions' and 'SF_RAW'. Please verify sheet names."
-      };
+        return { 
+            success: false, 
+            message: "Error: Could not find 'Transactions' sheet in current spreadsheet or 'SF_RAW' sheet in reference spreadsheet." 
+        };
     }
 
-    // Get all data from both sheets (starting from row 2)
     const transactionsData = transactionsSheet.getRange(2, 1, transactionsSheet.getLastRow() - 1, transactionsSheet.getLastColumn()).getValues();
     const sfRawData = sfRawSheet.getRange(2, 1, sfRawSheet.getLastRow() - 1, sfRawSheet.getLastColumn()).getValues();
     
-    // Create border styles
     const greenBorder = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
     const greenColor = '#00FF00';
     const redBorder = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
     const redColor = '#FF0000';
 
-    // Process each row in the transactions sheet
-    transactionsData.forEach((transactionRow, rowIndex) => {
-      // Get relevant values from transactions sheet and trim whitespace where needed
-      const beneficiaryName = (transactionRow[22] || '').toString().toLowerCase().trim(); // Column W
-      const transactionNumber = (transactionRow[0] || '').toString().trim(); // Column A
-      const destinationCurrency = transactionRow[1]; // Column B - No trim (as specified)
-      const beneficiaryAccountNumber = (transactionRow[37] || '').toString().trim(); // Column AL
-      const routingCodeValue1 = (transactionRow[42] || '').toString().trim(); // Column AQ
-      const columnCValue = (transactionRow[2] || '').toString().trim(); // Column C
-      const columnFValue = (transactionRow[5] || '').toString().trim(); // Column F
-      const columnEValue = (transactionRow[4] || '').toString().trim(); // Column E
+    // Create a map to store SF_RAW entries by beneficiary name
+    const sfRawMap = new Map();
+    sfRawData.forEach((sfRow, index) => {
+      const bankInfo = sfRow[9];
+      if (!bankInfo) return;
       
-      // Find matching row in SF_RAW
-      sfRawData.forEach((sfRow) => {
-        const invoiceNumber = (sfRow[2] || '').toString().trim(); // Column C
-        const columnHValue = (sfRow[7] || '').toString().trim(); // Column H
-        const bankInfo = sfRow[9]; // Column J
-        const columnIValue = (sfRow[8] || '').toString().trim(); // Column I
-        
-        // Skip if either name is empty
-        if (!beneficiaryName) {
-          return;
+      try {
+        const bankInfoObj = JSON.parse(bankInfo);
+        if (bankInfoObj.beneficiaryAccountNumber) {
+          bankInfoObj.beneficiaryAccountNumber = bankInfoObj.beneficiaryAccountNumber.trim();
         }
-
-        // Parse JSON in bank info column
-        let bankInfoObj;
-        try {
-          if (bankInfo) {
-            bankInfoObj = JSON.parse(bankInfo);
-            // Trim whitespace from JSON values if they exist
-            if (bankInfoObj.beneficiaryAccountNumber) {
-              bankInfoObj.beneficiaryAccountNumber = bankInfoObj.beneficiaryAccountNumber.trim();
-            }
-            if (bankInfoObj.routingCodeValue1) {
-              bankInfoObj.routingCodeValue1 = bankInfoObj.routingCodeValue1.trim();
-            }
-          } else {
-            return; // Skip if bankInfo is empty
-          }
-        } catch (e) {
-          Logger.log('Error parsing JSON for row: ' + (rowIndex + 2) + '. Error: ' + e.message);
-          return;
+        if (bankInfoObj.routingCodeValue1) {
+          bankInfoObj.routingCodeValue1 = bankInfoObj.routingCodeValue1.trim();
         }
         
-        // Check if names match (case-insensitive and trimmed)
-        if (beneficiaryName === bankInfoObj.beneficiaryName.toLowerCase().trim()) {
-          // Set green border for beneficiary name cell
-          const nameCell = transactionsSheet.getRange(rowIndex + 2, 23); // Column W
-          nameCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-          
-          // 1. Verify transaction number (Tab1.A = Tab2.C)
-          if (invoiceNumber === transactionNumber) {
-            const transactionCell = transactionsSheet.getRange(rowIndex + 2, 1); // Column A
-            transactionCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-          } else {
-            const transactionCell = transactionsSheet.getRange(rowIndex + 2, 1); // Column A
-            transactionCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
-          }
-          
-          // 2. Verify destination currency
-          if (bankInfoObj.destinationCurrency === destinationCurrency) {
-            const currencyCell = transactionsSheet.getRange(rowIndex + 2, 2); // Column B
-            currencyCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-          } else {
-            const currencyCell = transactionsSheet.getRange(rowIndex + 2, 2); // Column B
-            currencyCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
-          }
-
-          // 3. Verify Invoice Currency (Column E - only green border, no red)
-          if (columnEValue === columnIValue) {
-            const columnECell = transactionsSheet.getRange(rowIndex + 2, 5); // Column E
-            columnECell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-          }
-          
-          // 4. Verify beneficiary account number
-          if (bankInfoObj.beneficiaryAccountNumber) {
-            const cleanBankInfoAccount = bankInfoObj.beneficiaryAccountNumber.replace(/\s+/g, '');
-            const cleanTransactionAccount = beneficiaryAccountNumber.replace(/\s+/g, '');
-            
-            if (cleanBankInfoAccount === cleanTransactionAccount) {
-              const accountCell = transactionsSheet.getRange(rowIndex + 2, 38); // Column AL
-              accountCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-            } else {
-              const accountCell = transactionsSheet.getRange(rowIndex + 2, 38); // Column AL
-              accountCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
-            }
-          }
-          
-          // 5. Verify routing code value
-          if (bankInfoObj.routingCodeValue1 && routingCodeValue1) {
-            const cleanBankInfoRouting = bankInfoObj.routingCodeValue1.replace(/\s+/g, '');
-            const cleanTransactionRouting = routingCodeValue1.replace(/\s+/g, '');
-            
-            if (cleanBankInfoRouting === cleanTransactionRouting) {
-              const routingCell = transactionsSheet.getRange(rowIndex + 2, 43); // Column AQ
-              routingCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-            } else {
-              const routingCell = transactionsSheet.getRange(rowIndex + 2, 43); // Column AQ
-              routingCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
-            }
-          }
-
-          // 6. Verify if Column C or F matches Column H from SF_RAW
-            const cMatches = columnCValue === columnHValue;
-            const fMatches = columnFValue === columnHValue;
-
-            // Apply green border to Column C if it matches
-            if (cMatches) {
-              const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3); // Column C
-              columnCCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-            } else if (!cMatches && !fMatches) {
-              // Only apply red border to Column C if neither C nor F matches
-              const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3); // Column C
-              columnCCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
-            }
-
-            // Apply green border to Column F if it matches
-            if (fMatches) {
-              const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6); // Column F
-              columnFCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
-            } else if (!cMatches && !fMatches) {
-              // Only apply red border to Column F if neither C nor F matches
-              const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6); // Column F
-              columnFCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
-            }
+        const name = bankInfoObj.beneficiaryName.toLowerCase().trim();
+        if (!sfRawMap.has(name)) {
+          sfRawMap.set(name, []);
         }
-      });
+        sfRawMap.get(name).push({
+          row: sfRow,
+          bankInfoObj: bankInfoObj
+        });
+      } catch (e) {
+        Logger.log('Error parsing JSON in SF_RAW: ' + e.message);
+      }
+    });
+
+    // Process each transaction row
+    transactionsData.forEach((transactionRow, rowIndex) => {
+      const beneficiaryName = (transactionRow[22] || '').toString().toLowerCase().trim();
+      const transactionNumber = (transactionRow[0] || '').toString().trim();
+      const destinationCurrency = transactionRow[1];
+      const beneficiaryAccountNumber = (transactionRow[37] || '').toString().trim();
+      const routingCodeValue1 = (transactionRow[42] || '').toString().trim();
+      const columnCValue = (transactionRow[2] || '').toString().trim();
+      const columnFValue = (transactionRow[5] || '').toString().trim();
+      const columnEValue = (transactionRow[4] || '').toString().trim();
+
+      if (!beneficiaryName) return;
+
+      const matchingSfRows = sfRawMap.get(beneficiaryName) || [];
+
+      if (matchingSfRows.length > 0) {
+        // Set green border for beneficiary name
+        const nameCell = transactionsSheet.getRange(rowIndex + 2, 23);
+        nameCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+
+        // Try to find exact transaction number match first
+        let bestMatch = matchingSfRows.find(match => 
+          (match.row[2] || '').toString().trim() === transactionNumber
+        ) || matchingSfRows[0]; // If no match, use first entry
+
+        const sfRow = bestMatch.row;
+        const bankInfoObj = bestMatch.bankInfoObj;
+        const invoiceNumber = (sfRow[2] || '').toString().trim();
+        const columnHValue = (sfRow[7] || '').toString().trim();
+        const columnIValue = (sfRow[8] || '').toString().trim();
+
+        // Transaction number verification
+        if (invoiceNumber === transactionNumber) {
+          const transactionCell = transactionsSheet.getRange(rowIndex + 2, 1);
+          transactionCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        } else {
+          const transactionCell = transactionsSheet.getRange(rowIndex + 2, 1);
+          transactionCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+        }
+
+        // Currency verification
+        if (bankInfoObj.destinationCurrency === destinationCurrency) {
+          const currencyCell = transactionsSheet.getRange(rowIndex + 2, 2);
+          currencyCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        } else {
+          const currencyCell = transactionsSheet.getRange(rowIndex + 2, 2);
+          currencyCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+        }
+
+        // Invoice Currency verification
+        if (columnEValue === columnIValue) {
+          const columnECell = transactionsSheet.getRange(rowIndex + 2, 5);
+          columnECell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        }
+
+        // Account number verification
+        if (bankInfoObj.beneficiaryAccountNumber) {
+          const cleanBankInfoAccount = bankInfoObj.beneficiaryAccountNumber.replace(/\s+/g, '');
+          const cleanTransactionAccount = beneficiaryAccountNumber.replace(/\s+/g, '');
+          
+          if (cleanBankInfoAccount === cleanTransactionAccount) {
+            const accountCell = transactionsSheet.getRange(rowIndex + 2, 38);
+            accountCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+          } else {
+            const accountCell = transactionsSheet.getRange(rowIndex + 2, 38);
+            accountCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+          }
+        }
+
+        // Routing code verification
+        if (bankInfoObj.routingCodeValue1 && routingCodeValue1) {
+          const cleanBankInfoRouting = bankInfoObj.routingCodeValue1.replace(/\s+/g, '');
+          const cleanTransactionRouting = routingCodeValue1.replace(/\s+/g, '');
+          
+          if (cleanBankInfoRouting === cleanTransactionRouting) {
+            const routingCell = transactionsSheet.getRange(rowIndex + 2, 43);
+            routingCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+          } else {
+            const routingCell = transactionsSheet.getRange(rowIndex + 2, 43);
+            routingCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+          }
+        }
+
+        // Column C and F verification
+        const cMatches = columnCValue === columnHValue;
+        const fMatches = columnFValue === columnHValue;
+
+        if (cMatches) {
+          const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3);
+          columnCCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        } else if (!cMatches && !fMatches) {
+          const columnCCell = transactionsSheet.getRange(rowIndex + 2, 3);
+          columnCCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+        }
+
+        if (fMatches) {
+          const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6);
+          columnFCell.setBorder(true, true, true, true, null, null, greenColor, greenBorder);
+        } else if (!cMatches && !fMatches) {
+          const columnFCell = transactionsSheet.getRange(rowIndex + 2, 6);
+          columnFCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+        }
+
+      } else {
+        // No matching beneficiary name found
+        const nameCell = transactionsSheet.getRange(rowIndex + 2, 23);
+        nameCell.setBorder(true, true, true, true, null, null, redColor, redBorder);
+      }
     });
 
     return {
